@@ -1,11 +1,15 @@
 // src/app/shared/components/sidebar/sidebar.component.ts
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { animate, state, style, transition, trigger } from '@angular/animations';
 import {NavItem} from '../../../core/models/nav-item.interface';
+import {LayoutService} from '../../../core/services/layout.service';
+import {NavigationService} from '../../../core/services/navigation.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -15,103 +19,96 @@ import {NavItem} from '../../../core/models/nav-item.interface';
     RouterModule,
     MatListModule,
     MatIconModule,
-    MatExpansionModule
+    MatExpansionModule,
+    MatTooltipModule
   ],
   template: `
-    <div class="sidebar" [class.expanded]="isExpanded">
+    <aside class="sidebar" [@sidebarState]="layoutService.getSidebarState()() ? 'expanded' : 'collapsed'">
       <mat-nav-list>
         @for (item of navItems; track item.route) {
           @if (!item.children) {
-            <a mat-list-item [routerLink]="[item.route]" routerLinkActive="active">
+            <a mat-list-item
+               [routerLink]="[item.route]"
+               routerLinkActive="active"
+               [matTooltip]="!layoutService.getSidebarState()() ? item.label : ''"
+               matTooltipPosition="right">
               <mat-icon matListItemIcon>{{item.icon}}</mat-icon>
-              <span matListItemTitle>{{item.label}}</span>
+              <span matListItemTitle [@labelState]="layoutService.getSidebarState()() ? 'show' : 'hide'">
+                {{item.label}}
+              </span>
             </a>
           } @else {
-            <mat-expansion-panel>
+            <mat-expansion-panel
+              [expanded]="isRouteActive(item.route)"
+              [@expansionState]="layoutService.getSidebarState()() ? 'expanded' : 'collapsed'">
               <mat-expansion-panel-header>
                 <mat-panel-title>
                   <mat-icon>{{item.icon}}</mat-icon>
-                  <span>{{item.label}}</span>
+                  <span [@labelState]="layoutService.getSidebarState()() ? 'show' : 'hide'">
+                    {{item.label}}
+                  </span>
                 </mat-panel-title>
               </mat-expansion-panel-header>
               @for (child of item.children; track child.route) {
-                <a mat-list-item [routerLink]="[child.route]" routerLinkActive="active">
+                <a mat-list-item
+                   [routerLink]="[child.route]"
+                   routerLinkActive="active"
+                   class="child-item">
                   <mat-icon matListItemIcon>{{child.icon}}</mat-icon>
-                  <span matListItemTitle>{{child.label}}</span>
+                  <span matListItemTitle [@labelState]="layoutService.getSidebarState()() ? 'show' : 'hide'">
+                    {{child.label}}
+                  </span>
                 </a>
               }
             </mat-expansion-panel>
           }
         }
       </mat-nav-list>
-    </div>
+    </aside>
   `,
-  styles: [`
-    .sidebar {
-      width: 250px;
-      background-color: #fff;
-      box-shadow: 2px 0 6px rgba(0,0,0,0.1);
-      height: 100%;
-      transition: width 0.3s ease;
-
-      &.expanded {
-        width: 250px;
-      }
-
-      &:not(.expanded) {
-        width: 60px;
-
-        .mat-list-item-content {
-          padding: 0 8px;
-        }
-
-        span {
-          display: none;
-        }
-      }
-    }
-
-    .mat-nav-list {
-      padding-top: 0;
-    }
-
-    .mat-list-item {
-      &.active {
-        background-color: rgba(0,0,0,0.04);
-        color: var(--primary-color);
-
-        mat-icon {
-          color: var(--primary-color);
-        }
-      }
-    }
-
-    mat-icon {
-      margin-right: 12px;
-    }
-
-    .mat-expansion-panel {
-      box-shadow: none;
-      background: transparent;
-
-      .mat-expansion-panel-header {
-        padding: 0 16px;
-      }
-
-      .mat-expansion-panel-header-title {
-        align-items: center;
-
-        mat-icon {
-          margin-right: 12px;
-        }
-      }
-    }
-  `]
+  styles: [/* ... estilos previos ... */],
+  animations: [
+    trigger('sidebarState', [
+      state('expanded', style({
+        width: 'var(--sidebar-width)'
+      })),
+      state('collapsed', style({
+        width: 'var(--sidebar-collapsed-width)'
+      })),
+      transition('expanded <=> collapsed', animate('300ms ease'))
+    ]),
+    trigger('labelState', [
+      state('show', style({
+        opacity: 1
+      })),
+      state('hide', style({
+        opacity: 0,
+        display: 'none'
+      })),
+      transition('show => hide', animate('200ms ease')),
+      transition('hide => show', animate('200ms ease'))
+    ]),
+    trigger('expansionState', [
+      state('expanded', style({
+        height: '*'
+      })),
+      state('collapsed', style({
+        height: '48px',
+        overflow: 'hidden'
+      })),
+      transition('expanded <=> collapsed', animate('300ms ease'))
+    ])
+  ]
 })
 export class SidebarComponent {
-  isExpanded = true;
+  layoutService = inject(LayoutService);
+  navigationService = inject(NavigationService);
 
-  navItems: NavItem[] = [
+  isRouteActive(route: string): boolean {
+    return this.navigationService.getCurrentPath()().startsWith(route);
+  }
+
+navItems: NavItem[] = [
     {
       label: 'Dashboard',
       icon: 'dashboard',
@@ -177,8 +174,4 @@ export class SidebarComponent {
       route: '/settings'
     }
   ];
-
-  toggleSidebar() {
-    this.isExpanded = !this.isExpanded;
-  }
 }
